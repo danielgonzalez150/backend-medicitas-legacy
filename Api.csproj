@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>f77f568a-05e9-4bc4-ab8a-ed54c827e2f6</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,6 +12,8 @@
     <PackageReference Include="Dapper" Version="2.1.89" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Supabase" Version="8.4.0" />
+    <PackageReference Include="Supabase.Extensions.DependencyInjection" Version="8.4.0" />
   </ItemGroup>
 
 </Project>
