@@ -1,13 +1,24 @@
-# 1. Fase de compilación (SDK 10)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
+
+# Copiar la solución y todos los archivos de proyecto
+COPY ["CitasMedicas.sln", "./"]
+COPY ["Api/Api.csproj", "Api/"]
+COPY ["Application/Application.csproj", "Application/"]
+COPY ["Infrastructure/Infrastructure.csproj", "Infrastructure/"]
+COPY ["Domain/Domain.csproj", "Domain/"]
+
+# Restaurar dependencias de toda la solución
+RUN dotnet restore "CitasMedicas.sln"
+
+# Copiar el resto del código y compilar la API
 COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/out
+WORKDIR "/src/Api"
+RUN dotnet publish "Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# 2. Fase de ejecución (CAMBIA ESTA LÍNEA A 10.0)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-COPY --from=build /app/out .
+EXPOSE 8080
 
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Api.dll"]
