@@ -39,10 +39,21 @@ public class PacienteRepository
 
     public async Task<IEnumerable<PacienteResponseDto>> ObtenerTodosAsync()
     {
-        var sql = @"SELECT p.id_paciente AS IdPaciente, p.id_usuario AS IdUsuario, p.tipo_documento AS TipoDocumento, 
-                           p.numero_documento AS NumeroDocumento, p.nombre AS Nombre, p.apellido AS Apellido, 
-                           p.telefono AS Telefono, p.fecha_nacimiento AS FechaNacimiento, u.correo AS Correo
-                    FROM pacientes p JOIN usuarios u ON p.id_usuario = u.id_usuario";
+        const string sql = @"
+            SELECT 
+                p.id_paciente AS IdPaciente,
+                p.id_usuario AS IdUsuario,
+                p.tipo_documento AS TipoDocumento,
+                p.numero_documento AS NumeroDocumento,
+                p.nombre AS Nombre,
+                p.apellido AS Apellido,
+                p.telefono AS Telefono,
+                p.fecha_nacimiento AS FechaNacimiento,
+                u.correo AS Correo
+            FROM pacientes p
+            INNER JOIN usuarios u ON p.id_usuario = u.id_usuario;";
+
+        // Corrección: Usar la instancia inyectada _db en lugar de _connectionFactory
         return await _db.QueryAsync<PacienteResponseDto>(sql);
     }
 
