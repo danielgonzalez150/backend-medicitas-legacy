@@ -1,17 +1,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copiar la solución y todos los archivos de proyecto
-COPY ["CitasMedicas.slnx", "./"]
+# Copiar el archivo .slnx (o cualquier archivo de solución) y todos los proyectos
+COPY ["*.slnx", "./"]
 COPY ["Api/Api.csproj", "Api/"]
 COPY ["Application/Application.csproj", "Application/"]
 COPY ["Infrastructure/Infrastructure.csproj", "Infrastructure/"]
 COPY ["Domain/Domain.csproj", "Domain/"]
 
-# Restaurar dependencias de toda la solución
-RUN dotnet restore "CitasMedicas.sln"
+# Restaurar dependencias sin especificar el nombre exacto del .sln (dotnet lo detecta solo en /src)
+RUN dotnet restore
 
-# Copiar el resto del código y compilar la API
+# Copiar todo el código fuente y compilar la API
 COPY . .
 WORKDIR "/src/Api"
 RUN dotnet publish "Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
