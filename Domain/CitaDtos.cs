@@ -19,3 +19,10 @@ public class HorarioResponseDto
     public int IntervaloMinutos { get; set; }
     public bool Estado { get; set; }
 }
+
+public record CrearCitaRequestDto(
+    int IdMedico,
+    int? IdPaciente, // Será null si el paciente agenda para sí mismo, se llena con el token
+    DateOnly Fecha,
+    TimeSpan HoraInicio
+);
