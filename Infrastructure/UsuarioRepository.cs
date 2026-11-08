@@ -12,7 +12,7 @@ public class UsuarioRepository
 
     public async Task<UsuarioDbDto?> ObteneporCorreoAsync(string correo)
     {
-        var sql = "SELECT id_usuario AS IdUsuario, correo AS Correo, contrasena_hash AS ContrasenaHash, id_rol AS IdRol FROM usuarios WHERE correo = @correo AND estado = true";
+        var sql = "SELECT id_usuario AS IdUsuario, correo AS Correo, contrasena_hash AS ContrasenaHash, id_rol AS IdRol, estado AS Estado FROM usuarios WHERE correo = @correo AND estado = true";
         return await _db.QueryFirstOrDefaultAsync<UsuarioDbDto>(sql, new { correo });
     }
 
