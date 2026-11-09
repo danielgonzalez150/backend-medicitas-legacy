@@ -1,8 +1,8 @@
 using System.Data;
 using Dapper;
-using Domain;
+using Domain.DTOs;
 
-namespace Infrastructure;
+namespace Infrastructure.Repositories;
 
 public class PacienteRepository
 {
