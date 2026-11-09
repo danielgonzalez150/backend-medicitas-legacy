@@ -1,9 +1,12 @@
-using Application;
-using Application.Validators;
-using Infrastructure;
 using Api.Endpoints;
+using Application.Services;         // Inyección de Servicios modularizados
+using Application.Validators;       // Validadores FluentValidation
 using Domain;
+using Domain.DTOs;                 // DTOs agrupados (PacienteDTOs, MedicoDTOs, AuthDTOs, CitaDTOs)
+using Domain.Entities;
 using FluentValidation;
+using Infrastructure;              // Extensión AddDatabaseConfiguration
+using Infrastructure.Repositories; // Repositorios modularizados
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +20,7 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+// Configuración de la base de datos (PostgreSQL/Dapper)
 builder.Services.AddDatabaseConfiguration(builder.Configuration);
 
 // 1. Configuración de Autenticación JWT
@@ -36,22 +40,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// Habilitar Autorización basada en roles y políticas
+// Habilitar Autorización basada en roles
 builder.Services.AddAuthorization();
 
-// 2. Inyección de Repositorios (Infrastructure)
+// 2. Inyección de Repositorios (Infrastructure.Repositories)
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<PacienteRepository>();
 builder.Services.AddScoped<MedicoRepository>();
-builder.Services.AddScoped<HorarioRepository>(); // NUEVO
-builder.Services.AddScoped<CitaRepository>();    // NUEVO
+builder.Services.AddScoped<HorarioRepository>();
+builder.Services.AddScoped<CitaRepository>();
 
-// 3. Inyección de Servicios (Application)
+// 3. Inyección de Servicios (Application.Services)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PacienteService>();
 builder.Services.AddScoped<MedicoService>();
 builder.Services.AddScoped<HorarioService>();
-builder.Services.AddScoped<CitaService>();       // Añadido para Sprint 2
+builder.Services.AddScoped<CitaService>();
 
 // 4. Inyección de Validadores (FluentValidation)
 builder.Services.AddScoped<IValidator<RegistroPacienteRequestDto>, RegistroPacienteValidator>();
@@ -62,7 +66,7 @@ var app = builder.Build();
 app.UseCors();
 app.UseStaticFiles();
 
-// 5. Agregar Middlewares de Seguridad (El orden es estricto: primero AuthN, luego AuthZ)
+// 5. Middlewares de Seguridad (Orden estricto)
 app.UseAuthentication(); 
 app.UseAuthorization();  
 
@@ -70,7 +74,7 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapPacienteEndpoints();
 app.MapMedicoEndpoints();
-app.MapHorarioEndpoints(); // ¡Línea descomentada que soluciona el 404!
-// app.MapCitasEndpoints(); // Descomentar cuando crees CitasEndpoints.cs
+app.MapHorarioEndpoints();
+app.MapCitasEndpoints();
 
 app.Run();
