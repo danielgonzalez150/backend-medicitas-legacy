@@ -1,4 +1,4 @@
-namespace Domain;
+namespace Domain.DTOs;
 
 public class ConfigurarHorarioRequestDto
 {
@@ -25,4 +25,24 @@ public record CrearCitaRequestDto(
     int? IdPaciente, // Será null si el paciente agenda para sí mismo, se llena con el token
     DateOnly Fecha,
     TimeSpan HoraInicio
+);
+public record ReprogramarCitaRequestDto(
+    DateOnly NuevaFecha,
+    TimeSpan NuevaHoraInicio
+);
+public record CambiarEstadoCitaDto(
+    int IdEstado // 2: Atendida, 3: Inasistencia, 4: Cancelada
+);
+public record CitaDetalleDto(
+    int IdCita,
+    int IdPaciente,
+    string NombrePaciente, // Nombre + Apellido del Paciente
+    int IdMedico,
+    string NombreMedico,   // Nombre + Apellido del Médico
+    string Especialidad,   // Nombre de la especialidad
+    DateOnly Fecha,
+    TimeSpan HoraInicio,
+    TimeSpan HoraFin,
+    int IdEstado,
+    string NombreEstado    // 'Programada', 'Atendida', etc.
 );

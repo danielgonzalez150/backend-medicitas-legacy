@@ -1,4 +1,4 @@
-namespace Domain;
+namespace Domain.DTOs;
 
 public record LoginRequestDto(string Correo, string Contrasena);
 
