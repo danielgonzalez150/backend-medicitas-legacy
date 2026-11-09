@@ -1,10 +1,11 @@
-using Domain;
+using Domain.DTOs;
 using Infrastructure;
+using Infrastructure.Repositories;
 using BCrypt.Net;
 using System;
 using System.Threading.Tasks;
 
-namespace Application;
+namespace Application.Services;
 
 public class MedicoService
 {

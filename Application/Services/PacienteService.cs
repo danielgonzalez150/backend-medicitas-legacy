@@ -1,11 +1,11 @@
-using Domain;
-using Infrastructure;
+using Domain.DTOs;
+using Infrastructure.Repositories;
 using BCrypt.Net;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Application;
+namespace Application.Services;
 
 public class PacienteService
 {
