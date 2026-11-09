@@ -1,5 +1,5 @@
-using Application;
-using Domain;
+using Application.Services;
+using Domain.DTOs;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;

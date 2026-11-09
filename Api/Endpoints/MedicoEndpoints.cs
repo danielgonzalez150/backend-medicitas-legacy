@@ -1,7 +1,7 @@
-using Application;
-using Domain;
+using Application.Services;
+using Domain.DTOs;
 using FluentValidation;
-using Infrastructure;
+using Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
