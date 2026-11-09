@@ -49,13 +49,13 @@ builder.Services.AddScoped<CitaRepository>();    // NUEVO
 // 3. Inyección de Servicios (Application)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<PacienteService>();
-builder.Services.AddScoped<MedicoService>();   // NUEVO
-builder.Services.AddScoped<HorarioService>();  // NUEVO
-builder.Services.AddScoped<CitaService>();
+builder.Services.AddScoped<MedicoService>();
+builder.Services.AddScoped<HorarioService>();
+builder.Services.AddScoped<CitaService>();       // Añadido para Sprint 2
 
 // 4. Inyección de Validadores (FluentValidation)
-builder.Services.AddScoped<IValidator<RegistroPacienteRequestDto>, RegistroPacienteValidator>(); // NUEVO
-builder.Services.AddScoped<IValidator<CrearMedicoRequestDto>, CrearMedicoValidator>();         // NUEVO
+builder.Services.AddScoped<IValidator<RegistroPacienteRequestDto>, RegistroPacienteValidator>();
+builder.Services.AddScoped<IValidator<CrearMedicoRequestDto>, CrearMedicoValidator>();
 
 var app = builder.Build();
 
@@ -70,6 +70,7 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapPacienteEndpoints();
 app.MapMedicoEndpoints();
-// app.MapHorarioEndpoints(); // Descomentar cuando crees el archivo HorarioEndpoints.cs
+app.MapHorarioEndpoints(); // ¡Línea descomentada que soluciona el 404!
+// app.MapCitasEndpoints(); // Descomentar cuando crees CitasEndpoints.cs
 
 app.Run();
