@@ -42,5 +42,6 @@ public static class CitasEndpoints
                 return Results.Problem("Ocurrió un error inesperado al procesar la cita.");
             }
         }).RequireAuthorization(); // Requiere estar logueado
+
     }
 }
