@@ -72,16 +72,13 @@ public class HorarioRepository
     // 4. Obtener las horas ya ocupadas (citas programadas) en una fecha específica
     public async Task<IEnumerable<TimeSpan>> ObtenerHorasOcupadasAsync(int idMedico, DateOnly fecha)
     {
-        // En PostgreSQL usamos ::date y ::time para extraer partes de un TIMESTAMP
-        // Aseguramos que solo cuente las citas en estado 'Programada'
-        var sql = @"SELECT c.fecha_hora::time
-                    FROM citas c
-                    INNER JOIN estados_cita e ON c.id_estado = e.id_estado
-                    WHERE c.id_medico = @idMedico 
-                      AND c.fecha_hora::date = @fecha 
-                      AND e.nombre_estado = 'Programada';";
+        // Se consulta utilizando las columnas 'fecha' y 'hora_inicio' con id_estado = 1 (Programada)
+        var sql = @"SELECT hora_inicio 
+                    FROM citas 
+                    WHERE id_medico = @idMedico 
+                      AND fecha = @fecha 
+                      AND id_estado = 1;";
 
-        // Dapper mapeará automáticamente el ::time de PostgreSQL a TimeSpan en C#
         return await _db.QueryAsync<TimeSpan>(sql, new { idMedico, fecha });
     }
     
