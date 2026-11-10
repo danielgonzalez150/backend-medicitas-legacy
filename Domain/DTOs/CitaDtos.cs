@@ -1,3 +1,5 @@
+using System;
+
 namespace Domain.DTOs;
 
 public class ConfigurarHorarioRequestDto
@@ -5,7 +7,7 @@ public class ConfigurarHorarioRequestDto
     public int IdDia { get; set; }
     public TimeSpan HoraInicio { get; set; }
     public TimeSpan HoraFin { get; set; }
-    public int IntervaloMinutos { get; set; } = 30; // Valor por defecto sugerido
+    public int IntervaloMinutos { get; set; } = 30;
 }
 
 public class HorarioResponseDto
@@ -22,17 +24,21 @@ public class HorarioResponseDto
 
 public record CrearCitaRequestDto(
     int IdMedico,
-    int? IdPaciente, // Será null si el paciente agenda para sí mismo, se llena con el token
+    int? IdPaciente,  // Null si agenda el propio paciente tokenizado
     DateOnly Fecha,
-    TimeSpan HoraInicio
+    TimeSpan HoraInicio,
+    int IdSede = 1    // Id de Sede (por defecto Sede 1)
 );
+
 public record ReprogramarCitaRequestDto(
     DateOnly NuevaFecha,
     TimeSpan NuevaHoraInicio
 );
+
 public record CambiarEstadoCitaDto(
-    int IdEstado // 2: Atendida, 3: Inasistencia, 4: Cancelada
+    int IdEstado      // 2: Atendida, 3: Inasistencia, 4: Cancelada
 );
+
 public record CitaDetalleDto(
     int IdCita,
     int IdPaciente,
@@ -44,5 +50,7 @@ public record CitaDetalleDto(
     TimeSpan HoraInicio,
     TimeSpan HoraFin,
     int IdEstado,
-    string NombreEstado    // 'Programada', 'Atendida', etc.
+    string NombreEstado,   // 'Programada', 'Atendida', etc.
+    int IdSede,
+    string Lugar          // Nombre + Dirección de la Sede
 );
