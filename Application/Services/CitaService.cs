@@ -31,11 +31,13 @@ public class CitaService
 
         try
         {
+            // CORRECCIÓN: Se agrega req.IdSede según el nuevo esquema del repositorio
             var idCita = await _citaRepository.CrearAsync(
                 req.IdMedico, 
                 idPacienteFinal, 
                 req.Fecha, 
-                req.HoraInicio
+                req.HoraInicio,
+                req.IdSede 
             );
 
             return idCita;
@@ -56,44 +58,67 @@ public class CitaService
         }
     }
 
-    public async Task<List<TimeSpan>> ObtenerFranjasDisponiblesAsync(int idMedico, DateOnly fecha)
+    // MODIFICADO: Ahora evalúa la disponibilidad en un rango de fechas y devuelve un Diccionario
+    public async Task<Dictionary<DateOnly, List<TimeSpan>>> ObtenerFranjasDisponiblesAsync(int idMedico, DateOnly fechaInicio, DateOnly fechaFin)
     {
         var hoy = DateOnly.FromDateTime(DateTime.Now);
-        if (fecha < hoy)
-        {
-            return new List<TimeSpan>();
-        }
-
-        int idDia = fecha.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)fecha.DayOfWeek;
-
-        var horario = await _horarioRepository.ObtenerHorarioPorDiaAsync(idMedico, idDia);
         
-        if (horario == null)
+        // Ajustamos la fecha de inicio si intentan buscar en el pasado
+        if (fechaInicio < hoy) fechaInicio = hoy;
+        
+        if (fechaInicio > fechaFin)
         {
-            return new List<TimeSpan>();
+            return new Dictionary<DateOnly, List<TimeSpan>>();
         }
 
-        var franjasPosibles = new List<TimeSpan>();
-        var intervalo = TimeSpan.FromMinutes(horario.IntervaloMinutos);
-        var horaActual = horario.HoraInicio;
+        // Consulta optimizada para traer todas las horas ocupadas del rango de una sola vez
+        var ocupadasEnRango = await _citaRepository.ObtenerHorasOcupadasEnRangoAsync(idMedico, fechaInicio, fechaFin);
+        
+        var disponibilidad = new Dictionary<DateOnly, List<TimeSpan>>();
 
-        while (horaActual.Add(intervalo) <= horario.HoraFin)
+        // Iteramos sobre cada día del rango
+        for (var fecha = fechaInicio; fecha <= fechaFin; fecha = fecha.AddDays(1))
         {
-            if (fecha == hoy && horaActual < DateTime.Now.TimeOfDay)
+            int idDia = fecha.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)fecha.DayOfWeek;
+
+            var horario = await _horarioRepository.ObtenerHorarioPorDiaAsync(idMedico, idDia);
+            
+            if (horario == null)
             {
-                horaActual = horaActual.Add(intervalo);
+                disponibilidad[fecha] = new List<TimeSpan>(); // No trabaja este día
                 continue;
             }
 
-            franjasPosibles.Add(horaActual);
-            horaActual = horaActual.Add(intervalo);
+            var franjasPosibles = new List<TimeSpan>();
+            var intervalo = TimeSpan.FromMinutes(horario.IntervaloMinutos);
+            var horaActual = horario.HoraInicio;
+
+            while (horaActual.Add(intervalo) <= horario.HoraFin)
+            {
+                // Si es hoy, omitimos las horas que ya pasaron
+                if (fecha == hoy && horaActual < DateTime.Now.TimeOfDay)
+                {
+                    horaActual = horaActual.Add(intervalo);
+                    continue;
+                }
+
+                franjasPosibles.Add(horaActual);
+                horaActual = horaActual.Add(intervalo);
+            }
+
+            // Filtramos las horas ocupadas específicamente para el día en curso de la iteración
+            var horasOcupadasDelDia = ocupadasEnRango
+                .Where(o => o.Fecha == fecha)
+                .Select(o => o.HoraInicio)
+                .ToList();
+
+            var franjasDisponibles = franjasPosibles.Except(horasOcupadasDelDia).ToList();
+            franjasDisponibles.Sort();
+
+            disponibilidad[fecha] = franjasDisponibles;
         }
 
-        var horasOcupadas = await _citaRepository.ObtenerHorasOcupadasAsync(idMedico, fecha);
-        var franjasDisponibles = franjasPosibles.Except(horasOcupadas).ToList();
-        franjasDisponibles.Sort();
-
-        return franjasDisponibles;
+        return disponibilidad;
     }
 
     public async Task<IEnumerable<CitaDetalleDto>> ObtenerAgendaPacienteAsync(int idPaciente, DateOnly fechaInicio, DateOnly fechaFin)

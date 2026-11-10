@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -35,7 +36,7 @@ public class AuthService
         return new AuthResponseDto(user.IdUsuario, user.Correo, user.IdRol, token);
     }
 
-    private string GenerarJwtToken(UsuarioDbDto user) // Se usa el tipo de modelo que devuelva tu ObteneporCorreoAsync
+    private string GenerarJwtToken(UsuarioDbDto user) 
     {
         // Mapeamos el ID del rol al nombre según tu script SQL para que el middleware de .NET lo entienda
         string rolNombre = user.IdRol switch
@@ -51,13 +52,25 @@ public class AuthService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        // Estos son los datos que viajarán dentro del token
-        var claims = new[]
+        // Se usa una lista dinámica para poder agregar claims opcionales
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.IdUsuario.ToString()),
             new Claim(ClaimTypes.Email, user.Correo),
             new Claim(ClaimTypes.Role, rolNombre) // Este Claim es el que bloquea o permite el acceso a las rutas
         };
+
+        // Inyectamos el IdPaciente si el usuario tiene uno asociado
+        if (user.IdPaciente.HasValue)
+        {
+            claims.Add(new Claim("IdPaciente", user.IdPaciente.Value.ToString()));
+        }
+
+        // Inyectamos el IdMedico si el usuario tiene uno asociado
+        if (user.IdMedico.HasValue)
+        {
+            claims.Add(new Claim("IdMedico", user.IdMedico.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

@@ -11,4 +11,6 @@ public class UsuarioDbDto
     public string ContrasenaHash { get; set; } = string.Empty; 
     public int IdRol { get; set; } 
     public bool Estado { get; set; }    
+    public int? IdPaciente { get; set; } // Agrega esta línea
+    public int? IdMedico { get; set; }   // Agrega esta línea
 }
