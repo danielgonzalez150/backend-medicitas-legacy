@@ -24,18 +24,29 @@ public static class CitasEndpoints
         {
             try
             {
-                var idUsuarioClaim = user.FindFirst("idUsuario")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(idUsuarioClaim, out int idUsuarioToken))
-                    return Results.Unauthorized();
+                // CORRECCIÓN: Usar explícitamente el claim IdPaciente
+                var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
+                int idPacienteToken = 0;
+                
+                if (!string.IsNullOrEmpty(idPacienteClaim))
+                {
+                    int.TryParse(idPacienteClaim, out idPacienteToken);
+                }
 
-                var idCita = await service.AgendarCitaAsync(req, idUsuarioToken);
+                // Si no hay IdPaciente en el token y tampoco en el request, no se puede agendar
+                if (idPacienteToken == 0 && req.IdPaciente == null)
+                {
+                    return Results.BadRequest(new { error = "No se pudo identificar al paciente. Envíe el IdPaciente en la petición o inicie sesión como paciente." });
+                }
+
+                var idCita = await service.AgendarCitaAsync(req, idPacienteToken);
                 return Results.Ok(new { message = "Cita agendada con éxito", idCita });
             }
-            catch (InvalidOperationException ex) // Atrapa violaciones de índice único 23505 (Concurrencia)
+            catch (InvalidOperationException ex) 
             {
                 return Results.Conflict(new { error = ex.Message });
             }
-            catch (ArgumentException ex) // Errores de fecha en el pasado
+            catch (ArgumentException ex) 
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
@@ -45,7 +56,7 @@ public static class CitasEndpoints
             }
         });
 
-        // 2. GET /api/medicos/{idMedico}/disponibilidad?fecha=YYYY-MM-DD -> Franjas horarias libres
+        // 2. GET /api/medicos/{idMedico}/disponibilidad?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD -> Franjas horarias libres
         medicosGroup.MapGet("/{idMedico:int}/disponibilidad", async (
             int idMedico, 
             DateOnly fechaInicio, 
@@ -61,9 +72,10 @@ public static class CitasEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al consultar la disponibilidad.");
+                // CORRECCIÓN: Mostrar el error real de base de datos/backend para diagnosticar el 500
+                return Results.Problem($"Error interno: {ex.Message} | StackTrace: {ex.StackTrace}");
             }
         });
 
@@ -76,9 +88,13 @@ public static class CitasEndpoints
         {
             try
             {
-                var idUsuarioClaim = user.FindFirst("idUsuario")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(idUsuarioClaim, out int idPacienteToken))
-                    return Results.Unauthorized();
+                // CORRECCIÓN: Extraer explícitamente el claim IdPaciente, no el NameIdentifier
+                var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
+                
+                if (string.IsNullOrEmpty(idPacienteClaim) || !int.TryParse(idPacienteClaim, out int idPacienteToken))
+                {
+                    return Results.Unauthorized(); 
+                }
 
                 var citas = await service.ObtenerAgendaPacienteAsync(idPacienteToken, fechaInicio, fechaFin);
                 return Results.Ok(citas);
@@ -89,7 +105,7 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al consultar las citas del paciente.");
+                return Results.Problem($"Ocurrió un error inesperado al consultar las citas del paciente: {ex.Message}");
             }
         });
 
@@ -123,13 +139,13 @@ public static class CitasEndpoints
         {
             try
             {
-                var idUsuarioClaim = user.FindFirst("idUsuario")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(idUsuarioClaim, out int idUsuarioToken))
-                    return Results.Unauthorized();
+                // CORRECCIÓN: Utilizar IdPaciente para la validación de propiedad de la cita
+                var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
+                int.TryParse(idPacienteClaim, out int idPacienteToken); // Si es null, quedará en 0 (Admin/Recepcionista)
 
                 var rolUsuario = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("rol")?.Value ?? "";
 
-                var cancelado = await service.CancelarCitaAsync(id, idUsuarioToken, rolUsuario);
+                var cancelado = await service.CancelarCitaAsync(id, idPacienteToken, rolUsuario);
                 if (cancelado)
                     return Results.Ok(new { message = "Cita cancelada con éxito." });
 
@@ -162,13 +178,13 @@ public static class CitasEndpoints
         {
             try
             {
-                var idUsuarioClaim = user.FindFirst("idUsuario")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(idUsuarioClaim, out int idUsuarioToken))
-                    return Results.Unauthorized();
+                // CORRECCIÓN: Utilizar IdPaciente para la validación de propiedad de la cita
+                var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
+                int.TryParse(idPacienteClaim, out int idPacienteToken); 
 
                 var rolUsuario = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("rol")?.Value ?? "";
 
-                var reprogramado = await service.ReprogramarCitaAsync(id, req, idUsuarioToken, rolUsuario);
+                var reprogramado = await service.ReprogramarCitaAsync(id, req, idPacienteToken, rolUsuario);
                 if (reprogramado)
                     return Results.Ok(new { message = "Cita reprogramada con éxito." });
 
@@ -182,7 +198,7 @@ public static class CitasEndpoints
             {
                 return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (InvalidOperationException ex) // Cruce de franja horaria en reprogramación
+            catch (InvalidOperationException ex)
             {
                 return Results.Conflict(new { error = ex.Message });
             }
