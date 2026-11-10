@@ -48,19 +48,20 @@ public static class CitasEndpoints
         // 2. GET /api/medicos/{idMedico}/disponibilidad?fecha=YYYY-MM-DD -> Franjas horarias libres
         medicosGroup.MapGet("/{idMedico:int}/disponibilidad", async (
             int idMedico, 
-            DateOnly fecha, 
+            DateOnly fechaInicio, 
+            DateOnly fechaFin, 
             CitaService service) =>
         {
             try
             {
-                var franjas = await service.ObtenerFranjasDisponiblesAsync(idMedico, fecha);
-                return Results.Ok(franjas);
+                var disponibilidad = await service.ObtenerFranjasDisponiblesAsync(idMedico, fechaInicio, fechaFin);
+                return Results.Ok(disponibilidad);
             }
             catch (ArgumentException ex)
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Results.Problem("Ocurrió un error inesperado al consultar la disponibilidad.");
             }

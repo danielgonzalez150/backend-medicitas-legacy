@@ -43,22 +43,5 @@ public static class HorarioEndpoints
             var horarios = await service.ObtenerHorariosPorMedicoAsync(idMedico);
             return Results.Ok(horarios);
         });
-
-        // 3. Obtener las franjas horarias disponibles para agendar cita en una fecha (Accesible por Pacientes y Recepción)
-        group.MapGet("/disponibilidad", [Authorize(Roles = "Paciente,Recepcionista,Administrador")] async (
-            int idMedico, 
-            DateOnly fecha, 
-            HorarioService service) =>
-        {
-            try
-            {
-                var franjas = await service.ObtenerFranjasDisponiblesAsync(idMedico, fecha);
-                return Results.Ok(franjas);
-            }
-            catch (Exception ex)
-            {
-                return Results.BadRequest(new { error = "Error al consultar disponibilidad.", detalle = ex.Message });
-            }
-        });
     }
 }

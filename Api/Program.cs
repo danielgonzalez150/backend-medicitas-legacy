@@ -49,6 +49,7 @@ builder.Services.AddScoped<PacienteRepository>();
 builder.Services.AddScoped<MedicoRepository>();
 builder.Services.AddScoped<HorarioRepository>();
 builder.Services.AddScoped<CitaRepository>();
+builder.Services.AddScoped<EspecialidadRepository>();
 
 // 3. Inyección de Servicios (Application.Services)
 builder.Services.AddScoped<AuthService>();
@@ -56,6 +57,7 @@ builder.Services.AddScoped<PacienteService>();
 builder.Services.AddScoped<MedicoService>();
 builder.Services.AddScoped<HorarioService>();
 builder.Services.AddScoped<CitaService>();
+builder.Services.AddScoped<EspecialidadService>();
 
 // 4. Inyección de Validadores (FluentValidation)
 builder.Services.AddScoped<IValidator<RegistroPacienteRequestDto>, RegistroPacienteValidator>();
