@@ -22,14 +22,13 @@ public class EspecialidadRepository
     {
         using var connection = new NpgsqlConnection(_connectionString);
 
-        // Se obtienen todas las especialidades ordenadas alfabéticamente
+        // Se corrigió el nombre de la columna a 'nombre_especialidad' y se eliminó 'descripcion' porque no existe en la BD.
         var sql = @"
             SELECT 
                 id_especialidad AS IdEspecialidad,
-                nombre AS Nombre,
-                descripcion AS Descripcion
+                nombre_especialidad AS Nombre
             FROM especialidades
-            ORDER BY nombre ASC;";
+            ORDER BY nombre_especialidad ASC;";
 
         return await connection.QueryAsync<EspecialidadDto>(sql);
     }

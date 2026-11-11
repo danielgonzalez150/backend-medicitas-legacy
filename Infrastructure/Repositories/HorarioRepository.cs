@@ -1,27 +1,37 @@
-using System.Data;
 using Dapper;
 using Domain.DTOs;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Infrastructure.Repositories;
 
 public class HorarioRepository
 {
-    private readonly IDbConnection _db;
+    private readonly string _connectionString;
 
-    public HorarioRepository(IDbConnection db) => _db = db;
+    public HorarioRepository(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada.");
+    }
 
     // 1. Insertar una nueva configuración de horario
     public async Task<int> GuardarHorarioAsync(int idMedico, ConfigurarHorarioRequestDto dto)
     {
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"INSERT INTO horarios_medico 
                         (id_medico, id_dia, hora_inicio, hora_fin, intervalo_minutos, estado)
                     VALUES 
-                        (@idMedico, @IdDia, @HoraInicio, @HoraFin, @IntervaloMinutos, true)
+                        (@IdMedico, @IdDia, @HoraInicio, @HoraFin, @IntervaloMinutos, true)
                     RETURNING id_horario;";
 
-        return await _db.QuerySingleAsync<int>(sql, new
+        return await connection.QuerySingleAsync<int>(sql, new
         {
-            idMedico,
+            IdMedico = idMedico,
             dto.IdDia,
             dto.HoraInicio,
             dto.HoraFin,
@@ -29,9 +39,11 @@ public class HorarioRepository
         });
     }
 
-    // 2. Obtener todos los horarios de un médico (para el panel del administrador/médico)
+    // 2. Obtener todos los horarios de un médico
     public async Task<IEnumerable<HorarioResponseDto>> ObtenerPorMedicoAsync(int idMedico)
     {
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"SELECT 
                         h.id_horario AS IdHorario, 
                         h.id_medico AS IdMedico, 
@@ -43,15 +55,17 @@ public class HorarioRepository
                         h.estado AS Estado
                     FROM horarios_medico h
                     INNER JOIN dias_semana d ON h.id_dia = d.id_dia
-                    WHERE h.id_medico = @idMedico
+                    WHERE h.id_medico = @IdMedico
                     ORDER BY h.id_dia, h.hora_inicio;";
 
-        return await _db.QueryAsync<HorarioResponseDto>(sql, new { idMedico });
+        return await connection.QueryAsync<HorarioResponseDto>(sql, new { IdMedico = idMedico });
     }
 
-    // 3. Obtener el horario de un médico para un día específico (Usado por HorarioService para calcular franjas)
+    // 3. Obtener el horario de un médico para un día específico
     public async Task<HorarioResponseDto?> ObtenerHorarioPorDiaAsync(int idMedico, int idDia)
     {
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"SELECT 
                         h.id_horario AS IdHorario, 
                         h.id_medico AS IdMedico, 
@@ -63,33 +77,36 @@ public class HorarioRepository
                         h.estado AS Estado
                     FROM horarios_medico h
                     INNER JOIN dias_semana d ON h.id_dia = d.id_dia
-                    WHERE h.id_medico = @idMedico AND h.id_dia = @idDia AND h.estado = true
+                    WHERE h.id_medico = @IdMedico AND h.id_dia = @IdDia AND h.estado = true
                     LIMIT 1;";
 
-        return await _db.QueryFirstOrDefaultAsync<HorarioResponseDto>(sql, new { idMedico, idDia });
+        return await connection.QueryFirstOrDefaultAsync<HorarioResponseDto>(sql, new { IdMedico = idMedico, IdDia = idDia });
     }
 
-    // 4. Obtener las horas ya ocupadas (citas programadas) en una fecha específica
+    // 4. Obtener las horas ya ocupadas en una fecha específica
     public async Task<IEnumerable<TimeSpan>> ObtenerHorasOcupadasAsync(int idMedico, DateOnly fecha)
     {
-        // Se consulta utilizando las columnas 'fecha' y 'hora_inicio' con id_estado = 1 (Programada)
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"SELECT hora_inicio 
                     FROM citas 
-                    WHERE id_medico = @idMedico 
-                      AND fecha = @fecha 
+                    WHERE id_medico = @IdMedico 
+                      AND fecha = @Fecha 
                       AND id_estado = 1;";
 
-        return await _db.QueryAsync<TimeSpan>(sql, new { idMedico, fecha });
+        return await connection.QueryAsync<TimeSpan>(sql, new { IdMedico = idMedico, Fecha = fecha });
     }
     
-    // 5. (Opcional pero recomendado) Actualizar el estado de un horario (Activarlo/Desactivarlo)
+    // 5. Actualizar el estado de un horario (Activar/Desactivar)
     public async Task<bool> ActualizarEstadoHorarioAsync(int idHorario, bool estado)
     {
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"UPDATE horarios_medico 
-                    SET estado = @estado 
-                    WHERE id_horario = @idHorario;";
+                    SET estado = @Estado 
+                    WHERE id_horario = @IdHorario;";
                     
-        var filasAfectadas = await _db.ExecuteAsync(sql, new { idHorario, estado });
+        var filasAfectadas = await connection.ExecuteAsync(sql, new { IdHorario = idHorario, Estado = estado });
         return filasAfectadas > 0;
     }
 }

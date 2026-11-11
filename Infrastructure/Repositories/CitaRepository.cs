@@ -27,11 +27,15 @@ public class CitaRepository
         using var connection = new NpgsqlConnection(_connectionString);
 
         var horaFin = horaInicio.Add(TimeSpan.FromMinutes(30));
+        
+        // Se debe calcular e insertar fecha_hora porque en la BD es NOT NULL
+        var fechaHora = new DateTime(fecha.Year, fecha.Month, fecha.Day, horaInicio.Hours, horaInicio.Minutes, horaInicio.Seconds);
 
         var sql = @"
             INSERT INTO citas (
                 id_medico, 
                 id_paciente, 
+                fecha_hora,
                 fecha, 
                 hora_inicio, 
                 hora_fin, 
@@ -41,6 +45,7 @@ public class CitaRepository
             VALUES (
                 @IdMedico, 
                 @IdPaciente, 
+                @FechaHora,
                 @Fecha, 
                 @HoraInicio, 
                 @HoraFin, 
@@ -53,6 +58,7 @@ public class CitaRepository
         {
             IdMedico = idMedico,
             IdPaciente = idPaciente,
+            FechaHora = fechaHora,
             Fecha = fecha,
             HoraInicio = horaInicio,
             HoraFin = horaFin,
@@ -62,7 +68,6 @@ public class CitaRepository
         return await connection.ExecuteScalarAsync<int>(sql, parameters);
     }
 
-    // MODIFICADO: Ahora soporta cláusula BETWEEN para el rango de fechas
     public async Task<IEnumerable<FechaHoraOcupadaDto>> ObtenerHorasOcupadasEnRangoAsync(int idMedico, DateOnly fechaInicio, DateOnly fechaFin)
     {
         using var connection = new NpgsqlConnection(_connectionString);
@@ -87,9 +92,9 @@ public class CitaRepository
             SELECT 
                 c.id_cita AS IdCita,
                 c.id_paciente AS IdPaciente,
-                (up.nombre || ' ' || up.apellido) AS NombrePaciente,
+                (p.nombre || ' ' || p.apellido) AS NombrePaciente,
                 c.id_medico AS IdMedico,
-                (um.nombre || ' ' || um.apellido) AS NombreMedico,
+                (m.nombre || ' ' || m.apellido) AS NombreMedico,
                 e.nombre_especialidad AS Especialidad,
                 c.fecha AS Fecha,
                 c.hora_inicio AS HoraInicio,
@@ -99,8 +104,7 @@ public class CitaRepository
                 c.id_sede AS IdSede,
                 (s.nombre || ' - ' || s.direccion) AS Lugar
             FROM citas c
-            INNER JOIN usuarios up ON c.id_paciente = up.id_usuario
-            INNER JOIN usuarios um ON c.id_medico = um.id_usuario
+            INNER JOIN pacientes p ON c.id_paciente = p.id_paciente
             INNER JOIN medicos m ON c.id_medico = m.id_medico
             INNER JOIN especialidades e ON m.id_especialidad = e.id_especialidad
             INNER JOIN estados_cita ec ON c.id_estado = ec.id_estado
@@ -120,9 +124,9 @@ public class CitaRepository
             SELECT 
                 c.id_cita AS IdCita,
                 c.id_paciente AS IdPaciente,
-                (up.nombre || ' ' || up.apellido) AS NombrePaciente,
+                (p.nombre || ' ' || p.apellido) AS NombrePaciente,
                 c.id_medico AS IdMedico,
-                (um.nombre || ' ' || um.apellido) AS NombreMedico,
+                (m.nombre || ' ' || m.apellido) AS NombreMedico,
                 e.nombre_especialidad AS Especialidad,
                 c.fecha AS Fecha,
                 c.hora_inicio AS HoraInicio,
@@ -132,8 +136,7 @@ public class CitaRepository
                 c.id_sede AS IdSede,
                 (s.nombre || ' - ' || s.direccion) AS Lugar
             FROM citas c
-            INNER JOIN usuarios up ON c.id_paciente = up.id_usuario
-            INNER JOIN usuarios um ON c.id_medico = um.id_usuario
+            INNER JOIN pacientes p ON c.id_paciente = p.id_paciente
             INNER JOIN medicos m ON c.id_medico = m.id_medico
             INNER JOIN especialidades e ON m.id_especialidad = e.id_especialidad
             INNER JOIN estados_cita ec ON c.id_estado = ec.id_estado
@@ -184,10 +187,14 @@ public class CitaRepository
         using var connection = new NpgsqlConnection(_connectionString);
 
         var nuevaHoraFin = nuevaHoraInicio.Add(TimeSpan.FromMinutes(30));
+        
+        // Se debe actualizar también fecha_hora para mantener la integridad
+        var nuevaFechaHora = new DateTime(nuevaFecha.Year, nuevaFecha.Month, nuevaFecha.Day, nuevaHoraInicio.Hours, nuevaHoraInicio.Minutes, nuevaHoraInicio.Seconds);
 
         var sql = @"
             UPDATE citas 
-            SET fecha = @NuevaFecha,
+            SET fecha_hora = @NuevaFechaHora,
+                fecha = @NuevaFecha,
                 hora_inicio = @NuevaHoraInicio,
                 hora_fin = @NuevaHoraFin,
                 id_estado = 1 -- Garantiza que permanezca en estado 'Programada'
@@ -196,6 +203,7 @@ public class CitaRepository
         var filasAfectadas = await connection.ExecuteAsync(sql, new 
         { 
             IdCita = idCita, 
+            NuevaFechaHora = nuevaFechaHora,
             NuevaFecha = nuevaFecha, 
             NuevaHoraInicio = nuevaHoraInicio, 
             NuevaHoraFin = nuevaHoraFin 

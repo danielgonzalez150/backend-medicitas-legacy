@@ -1,24 +1,27 @@
-using System.Data;
 using Dapper;
-using System.Threading.Tasks;
 using Domain.DTOs;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using System;
+using System.Data;
+using System.Threading.Tasks;
 
 namespace Infrastructure.Repositories;
 
 public class UsuarioRepository
 {
-    private readonly IDbConnection _db;
-    
+    private readonly string _connectionString;
+
     public UsuarioRepository(IConfiguration configuration)
     {
-        _db = new NpgsqlConnection(configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada."));
+        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada.");
     }
 
-    public async Task<UsuarioDbDto?> ObteneporCorreoAsync(string correo)
+    public async Task<UsuarioDbDto?> ObtenerPorCorreoAsync(string correo)
     {
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"
             SELECT 
                 u.id_usuario AS IdUsuario, 
@@ -31,14 +34,21 @@ public class UsuarioRepository
             FROM usuarios u
             LEFT JOIN pacientes p ON u.id_usuario = p.id_usuario
             LEFT JOIN medicos m ON u.id_usuario = m.id_usuario
-            WHERE u.correo = @correo AND u.estado = true";
+            WHERE u.correo = @Correo AND u.estado = true;";
             
-        return await _db.QueryFirstOrDefaultAsync<UsuarioDbDto>(sql, new { correo });
+        return await connection.QueryFirstOrDefaultAsync<UsuarioDbDto>(sql, new { Correo = correo });
     }
 
-    public async Task<bool> ExisteCorreoAsync(string correo, IDbTransaction transaction)
+    public async Task<bool> ExisteCorreoAsync(string correo, IDbTransaction? transaction = null)
     {
-        var sql = "SELECT EXISTS(SELECT 1 FROM usuarios WHERE correo = @correo)";
-        return await _db.ExecuteScalarAsync<bool>(sql, new { correo }, transaction);
+        var sql = "SELECT EXISTS(SELECT 1 FROM usuarios WHERE correo = @Correo);";
+
+        if (transaction != null)
+        {
+            return await transaction.Connection!.ExecuteScalarAsync<bool>(sql, new { Correo = correo }, transaction);
+        }
+
+        using var connection = new NpgsqlConnection(_connectionString);
+        return await connection.ExecuteScalarAsync<bool>(sql, new { Correo = correo });
     }
 }

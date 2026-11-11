@@ -1,81 +1,101 @@
-using System.Data;
 using Dapper;
 using Domain.DTOs;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Infrastructure.Repositories;
 
 public class MedicoRepository
 {
-    private readonly IDbConnection _db;
-    
+    private readonly string _connectionString;
+
     public MedicoRepository(IConfiguration configuration)
     {
-        _db = new NpgsqlConnection(configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada."));
+        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada.");
     }
 
     public async Task<IEnumerable<MedicoResponseDto>> ObtenerTodosAsync()
     {
-        var sql = @"SELECT m.id_medico AS IdMedico, m.id_usuario AS IdUsuario, m.nombre AS Nombre, 
-                           m.apellido AS Apellido, m.tarjeta_profesional AS TarjetaProfesional, 
-                           e.nombre_especialidad AS NombreEspecialidad, u.correo AS Correo
+        using var connection = new NpgsqlConnection(_connectionString);
+
+        var sql = @"SELECT m.id_medico AS IdMedico, 
+                           m.id_usuario AS IdUsuario, 
+                           m.nombre AS Nombre, 
+                           m.apellido AS Apellido, 
+                           m.tarjeta_profesional AS TarjetaProfesional, 
+                           e.nombre_especialidad AS NombreEspecialidad, 
+                           u.correo AS Correo
                     FROM medicos m
-                    JOIN especialidades e ON m.id_especialidad = e.id_especialidad
-                    JOIN usuarios u ON m.id_usuario = u.id_usuario";
-        return await _db.QueryAsync<MedicoResponseDto>(sql);
+                    INNER JOIN especialidades e ON m.id_especialidad = e.id_especialidad
+                    INNER JOIN usuarios u ON m.id_usuario = u.id_usuario;";
+
+        return await connection.QueryAsync<MedicoResponseDto>(sql);
     }
 
     public async Task<int> CrearMedicoTransaccionalAsync(CrearMedicoRequestDto dto, string hashClave)
     {
-        if (_db.State != ConnectionState.Open) _db.Open();
-        using var transaction = _db.BeginTransaction();
+        using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        using var transaction = await connection.BeginTransactionAsync();
+
         try
         {
-            // id_rol = 2 corresponde a 'Medico' en tu tabla roles
+            // id_rol = 2 corresponde a 'Medico' en la tabla roles
             var sqlUsuario = @"INSERT INTO usuarios (correo, contrasena_hash, id_rol, estado) 
-                               VALUES (@Correo, @Hash, 2, true) RETURNING id_usuario;";
-            var idUsuario = await _db.QuerySingleAsync<int>(sqlUsuario, new { dto.Correo, Hash = hashClave }, transaction);
+                               VALUES (@Correo, @Hash, 2, true) 
+                               RETURNING id_usuario;";
+
+            var idUsuario = await connection.QuerySingleAsync<int>(sqlUsuario, new { dto.Correo, Hash = hashClave }, transaction);
 
             var sqlMedico = @"INSERT INTO medicos (id_usuario, id_especialidad, tarjeta_profesional, nombre, apellido)
-                              VALUES (@idUsuario, @IdEspecialidad, @TarjetaProfesional, @Nombre, @Apellido) RETURNING id_medico;";
+                              VALUES (@IdUsuario, @IdEspecialidad, @TarjetaProfesional, @Nombre, @Apellido) 
+                              RETURNING id_medico;";
             
-            var idMedico = await _db.QuerySingleAsync<int>(sqlMedico, new {
-                idUsuario, dto.IdEspecialidad, dto.TarjetaProfesional, dto.Nombre, dto.Apellido
+            var idMedico = await connection.QuerySingleAsync<int>(sqlMedico, new {
+                IdUsuario = idUsuario, 
+                dto.IdEspecialidad, 
+                dto.TarjetaProfesional, 
+                dto.Nombre, 
+                dto.Apellido
             }, transaction);
 
-            transaction.Commit();
+            await transaction.CommitAsync();
             return idMedico;
         }
         catch
         {
-            transaction.Rollback();
+            await transaction.RollbackAsync();
             throw;
         }
     }
 
     public async Task<bool> TieneCitasPendientesAsync(int idMedico)
     {
-        // Se hace un JOIN con estados_cita ya que el nombre del estado está normalizado en esa tabla
+        using var connection = new NpgsqlConnection(_connectionString);
+
         var sql = @"SELECT COUNT(1) 
                     FROM citas c
                     INNER JOIN estados_cita e ON c.id_estado = e.id_estado
-                    WHERE c.id_medico = @idMedico AND e.nombre_estado = 'Programada';";
+                    WHERE c.id_medico = @IdMedico AND e.nombre_estado = 'Programada';";
         
-        var count = await _db.ExecuteScalarAsync<int>(sql, new { idMedico });
+        var count = await connection.ExecuteScalarAsync<int>(sql, new { IdMedico = idMedico });
         return count > 0;
     }
 
     public async Task<bool> ActualizarEstadoAsync(int idMedico, bool estado)
     {
-        // El campo 'estado' (activo/inactivo) pertenece a la tabla usuarios, 
-        // así que lo actualizamos buscando el usuario asociado a este id_medico.
+        using var connection = new NpgsqlConnection(_connectionString);
+
+        // El campo 'estado' pertenece a la tabla usuarios
         var sql = @"UPDATE usuarios 
-                    SET estado = @estado 
-                    WHERE id_usuario = (SELECT id_usuario FROM medicos WHERE id_medico = @idMedico);";
+                    SET estado = @Estado 
+                    WHERE id_usuario = (SELECT id_usuario FROM medicos WHERE id_medico = @IdMedico);";
         
-        var filasAfectadas = await _db.ExecuteAsync(sql, new { idMedico, estado });
+        var filasAfectadas = await connection.ExecuteAsync(sql, new { IdMedico = idMedico, Estado = estado });
         return filasAfectadas > 0;
     }
 }
