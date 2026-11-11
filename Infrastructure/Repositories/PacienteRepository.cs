@@ -1,6 +1,8 @@
 using System.Data;
 using Dapper;
 using Domain.DTOs;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -8,7 +10,11 @@ public class PacienteRepository
 {
     private readonly IDbConnection _db;
     
-    public PacienteRepository(IDbConnection db) => _db = db;
+    public PacienteRepository(IConfiguration configuration)
+    {
+        _db = new NpgsqlConnection(configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada."));
+    }
 
     public async Task<int> CrearPacienteTransaccionalAsync(RegistroPacienteRequestDto dto, string hashClave)
     {

@@ -1,6 +1,8 @@
 using System.Data;
 using Dapper;
 using Domain.DTOs;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -8,7 +10,11 @@ public class MedicoRepository
 {
     private readonly IDbConnection _db;
     
-    public MedicoRepository(IDbConnection db) => _db = db;
+    public MedicoRepository(IConfiguration configuration)
+    {
+        _db = new NpgsqlConnection(configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada."));
+    }
 
     public async Task<IEnumerable<MedicoResponseDto>> ObtenerTodosAsync()
     {

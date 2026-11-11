@@ -2,6 +2,8 @@ using System.Data;
 using Dapper;
 using System.Threading.Tasks;
 using Domain.DTOs;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -9,7 +11,11 @@ public class UsuarioRepository
 {
     private readonly IDbConnection _db;
     
-    public UsuarioRepository(IDbConnection db) => _db = db;
+    public UsuarioRepository(IConfiguration configuration)
+    {
+        _db = new NpgsqlConnection(configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada."));
+    }
 
     public async Task<UsuarioDbDto?> ObteneporCorreoAsync(string correo)
     {
