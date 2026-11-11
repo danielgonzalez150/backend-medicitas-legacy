@@ -24,7 +24,7 @@ public class AuthService
 
     public async Task<AuthResponseDto?> AutenticarAsync(LoginRequestDto request)
     {
-        var user = await _repo.ObteneporCorreoAsync(request.Correo);
+        var user = await _repo.ObtenerPorCorreoAsync(request.Correo);
         
         // Se valida que el usuario exista, que la contraseña sea correcta y que su estado sea true (activo)
         if (user == null || !user.Estado || !BCrypt.Net.BCrypt.Verify(request.Contrasena, user.ContrasenaHash))
