@@ -31,7 +31,6 @@ public class CitaService
 
         try
         {
-            // CORRECCIÓN: Se agrega req.IdSede según el nuevo esquema del repositorio
             var idCita = await _citaRepository.CrearAsync(
                 req.IdMedico, 
                 idPacienteFinal, 
@@ -58,25 +57,21 @@ public class CitaService
         }
     }
 
-    // MODIFICADO: Ahora evalúa la disponibilidad en un rango de fechas y devuelve un Diccionario
-    public async Task<Dictionary<DateOnly, List<TimeSpan>>> ObtenerFranjasDisponiblesAsync(int idMedico, DateOnly fechaInicio, DateOnly fechaFin)
+    public async Task<Dictionary<DateOnly, List<TimeOnly>>> ObtenerFranjasDisponiblesAsync(int idMedico, DateOnly fechaInicio, DateOnly fechaFin)
     {
         var hoy = DateOnly.FromDateTime(DateTime.Now);
         
-        // Ajustamos la fecha de inicio si intentan buscar en el pasado
         if (fechaInicio < hoy) fechaInicio = hoy;
         
         if (fechaInicio > fechaFin)
         {
-            return new Dictionary<DateOnly, List<TimeSpan>>();
+            return new Dictionary<DateOnly, List<TimeOnly>>();
         }
 
-        // Consulta optimizada para traer todas las horas ocupadas del rango de una sola vez
         var ocupadasEnRango = await _citaRepository.ObtenerHorasOcupadasEnRangoAsync(idMedico, fechaInicio, fechaFin);
         
-        var disponibilidad = new Dictionary<DateOnly, List<TimeSpan>>();
+        var disponibilidad = new Dictionary<DateOnly, List<TimeOnly>>();
 
-        // Iteramos sobre cada día del rango
         for (var fecha = fechaInicio; fecha <= fechaFin; fecha = fecha.AddDays(1))
         {
             int idDia = fecha.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)fecha.DayOfWeek;
@@ -85,28 +80,25 @@ public class CitaService
             
             if (horario == null)
             {
-                disponibilidad[fecha] = new List<TimeSpan>(); // No trabaja este día
+                disponibilidad[fecha] = new List<TimeOnly>(); 
                 continue;
             }
 
-            var franjasPosibles = new List<TimeSpan>();
-            var intervalo = TimeSpan.FromMinutes(horario.IntervaloMinutos);
+            var franjasPosibles = new List<TimeOnly>();
             var horaActual = horario.HoraInicio;
 
-            while (horaActual.Add(intervalo) <= horario.HoraFin)
+            while (horaActual.AddMinutes(horario.IntervaloMinutos) <= horario.HoraFin)
             {
-                // Si es hoy, omitimos las horas que ya pasaron
-                if (fecha == hoy && horaActual < DateTime.Now.TimeOfDay)
+                if (fecha == hoy && horaActual < TimeOnly.FromDateTime(DateTime.Now))
                 {
-                    horaActual = horaActual.Add(intervalo);
+                    horaActual = horaActual.AddMinutes(horario.IntervaloMinutos);
                     continue;
                 }
 
                 franjasPosibles.Add(horaActual);
-                horaActual = horaActual.Add(intervalo);
+                horaActual = horaActual.AddMinutes(horario.IntervaloMinutos);
             }
 
-            // Filtramos las horas ocupadas específicamente para el día en curso de la iteración
             var horasOcupadasDelDia = ocupadasEnRango
                 .Where(o => o.Fecha == fecha)
                 .Select(o => o.HoraInicio)
@@ -154,13 +146,11 @@ public class CitaService
             throw new InvalidOperationException("Solo se pueden cancelar citas en estado 'Programada'.");
         }
 
-        // Validación de permisos: Solo el dueño de la cita, un Administrador o una Recepcionista pueden cancelar
         if (rolUsuario != "Administrador" && rolUsuario != "Recepcionista" && cita.IdPaciente != idUsuarioToken)
         {
             throw new UnauthorizedAccessException("No tienes autorización para cancelar esta cita.");
         }
 
-        // Estado 4 = Cancelada
         return await _citaRepository.ActualizarEstadoAsync(idCita, 4);
     }
 

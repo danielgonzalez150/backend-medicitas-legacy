@@ -84,17 +84,18 @@ public class HorarioRepository
     }
 
     // 4. Obtener las horas ya ocupadas en una fecha específica
-    public async Task<IEnumerable<TimeSpan>> ObtenerHorasOcupadasAsync(int idMedico, DateOnly fecha)
+    // Cambia la firma de IEnumerable<TimeSpan> a IEnumerable<TimeOnly>
+    public async Task<IEnumerable<TimeOnly>> ObtenerHorasOcupadasAsync(int idMedico, DateOnly fecha)
     {
         using var connection = new NpgsqlConnection(_connectionString);
 
         var sql = @"SELECT hora_inicio 
                     FROM citas 
                     WHERE id_medico = @IdMedico 
-                      AND fecha = @Fecha 
-                      AND id_estado = 1;";
+                    AND fecha = @Fecha 
+                    AND id_estado = 1;";
 
-        return await connection.QueryAsync<TimeSpan>(sql, new { IdMedico = idMedico, Fecha = fecha });
+        return await connection.QueryAsync<TimeOnly>(sql, new { IdMedico = idMedico, Fecha = fecha });
     }
     
     // 5. Actualizar el estado de un horario (Activar/Desactivar)

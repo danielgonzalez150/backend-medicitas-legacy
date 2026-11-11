@@ -9,9 +9,6 @@ using System.Threading.Tasks;
 
 namespace Infrastructure.Repositories;
 
-// Record auxiliar para mapear el resultado de la consulta por rango
-public record FechaHoraOcupadaDto(DateOnly Fecha, TimeSpan HoraInicio);
-
 public class CitaRepository
 {
     private readonly string _connectionString;
@@ -22,14 +19,12 @@ public class CitaRepository
             ?? throw new ArgumentNullException("La cadena de conexión 'DefaultConnection' no está configurada.");
     }
 
-    public async Task<int> CrearAsync(int idMedico, int idPaciente, DateOnly fecha, TimeSpan horaInicio, int idSede)
+    public async Task<int> CrearAsync(int idMedico, int idPaciente, DateOnly fecha, TimeOnly horaInicio, int idSede)
     {
         using var connection = new NpgsqlConnection(_connectionString);
 
-        var horaFin = horaInicio.Add(TimeSpan.FromMinutes(30));
-        
-        // Se debe calcular e insertar fecha_hora porque en la BD es NOT NULL
-        var fechaHora = new DateTime(fecha.Year, fecha.Month, fecha.Day, horaInicio.Hours, horaInicio.Minutes, horaInicio.Seconds);
+        var horaFin = horaInicio.AddMinutes(30);
+        var fechaHora = fecha.ToDateTime(horaInicio);
 
         var sql = @"
             INSERT INTO citas (
@@ -182,14 +177,12 @@ public class CitaRepository
         return filasAfectadas > 0;
     }
 
-    public async Task<bool> ReprogramarAsync(int idCita, DateOnly nuevaFecha, TimeSpan nuevaHoraInicio)
+    public async Task<bool> ReprogramarAsync(int idCita, DateOnly nuevaFecha, TimeOnly nuevaHoraInicio)
     {
         using var connection = new NpgsqlConnection(_connectionString);
 
-        var nuevaHoraFin = nuevaHoraInicio.Add(TimeSpan.FromMinutes(30));
-        
-        // Se debe actualizar también fecha_hora para mantener la integridad
-        var nuevaFechaHora = new DateTime(nuevaFecha.Year, nuevaFecha.Month, nuevaFecha.Day, nuevaHoraInicio.Hours, nuevaHoraInicio.Minutes, nuevaHoraInicio.Seconds);
+        var nuevaHoraFin = nuevaHoraInicio.AddMinutes(30);
+        var nuevaFechaHora = nuevaFecha.ToDateTime(nuevaHoraInicio);
 
         var sql = @"
             UPDATE citas 
