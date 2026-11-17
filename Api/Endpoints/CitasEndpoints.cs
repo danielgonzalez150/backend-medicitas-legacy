@@ -51,9 +51,13 @@ public static class CitasEndpoints
                 return Results.BadRequest(new { error = ex.Message });
             }
             catch (Exception ex)
-            {
-                return Results.Problem("Ocurrió un error inesperado al procesar la cita.");
-            }
+                {
+                    Console.WriteLine($"[ERROR AGENDAR CITA]: {ex}");
+                    return Results.Problem(
+                        detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                        statusCode: 500
+                    );
+                }
         });
 
         // 2. GET /api/medicos/{idMedico}/disponibilidad?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD -> Franjas horarias libres
