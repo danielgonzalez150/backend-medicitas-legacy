@@ -24,22 +24,23 @@ public static class CitasEndpoints
         {
             try
             {
-                // CORRECCIÓN: Usar explícitamente el claim IdPaciente
                 var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
-                int idPacienteToken = 0;
+                int? idPacienteToken = null;
                 
-                if (!string.IsNullOrEmpty(idPacienteClaim))
+                if (!string.IsNullOrEmpty(idPacienteClaim) && int.TryParse(idPacienteClaim, out int parsedId))
                 {
-                    int.TryParse(idPacienteClaim, out idPacienteToken);
+                    idPacienteToken = parsedId;
                 }
 
-                // Si no hay IdPaciente en el token y tampoco en el request, no se puede agendar
-                if (idPacienteToken == 0 && req.IdPaciente == null)
+                // Determinar qué ID de paciente usar: el del request (si lo envía un recepcionista/admin) o el del token
+                var idPacienteFinal = req.IdPaciente ?? idPacienteToken;
+
+                if (idPacienteFinal == null || idPacienteFinal <= 0)
                 {
-                    return Results.BadRequest(new { error = "No se pudo identificar al paciente. Envíe el IdPaciente en la petición o inicie sesión como paciente." });
+                    return Results.BadRequest(new { error = "No se pudo identificar un perfil de paciente válido. Envíe el IdPaciente en la petición o inicie sesión con una cuenta de paciente válida." });
                 }
 
-                var idCita = await service.AgendarCitaAsync(req, idPacienteToken);
+                var idCita = await service.AgendarCitaAsync(req, idPacienteFinal.Value);
                 return Results.Ok(new { message = "Cita agendada con éxito", idCita });
             }
             catch (InvalidOperationException ex) 
@@ -51,16 +52,16 @@ public static class CitasEndpoints
                 return Results.BadRequest(new { error = ex.Message });
             }
             catch (Exception ex)
-                {
-                    Console.WriteLine($"[ERROR AGENDAR CITA]: {ex}");
-                    return Results.Problem(
-                        detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
-                        statusCode: 500
-                    );
-                }
+            {
+                Console.WriteLine($"[ERROR AGENDAR CITA]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
+            }
         });
 
-        // 2. GET /api/medicos/{idMedico}/disponibilidad?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD -> Franjas horarias libres
+        // 2. GET /api/medicos/{idMedico}/disponibilidad
         medicosGroup.MapGet("/{idMedico:int}/disponibilidad", async (
             int idMedico, 
             DateOnly fechaInicio, 
@@ -78,12 +79,15 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                // CORRECCIÓN: Mostrar el error real de base de datos/backend para diagnosticar el 500
-                return Results.Problem($"Error interno: {ex.Message} | StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"[ERROR DISPONIBILIDAD]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
 
-        // 3. GET /api/citas/paciente?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD -> Mis Citas (Paciente)
+        // 3. GET /api/citas/paciente
         citasGroup.MapGet("/paciente", async (
             DateOnly fechaInicio, 
             DateOnly fechaFin, 
@@ -92,12 +96,11 @@ public static class CitasEndpoints
         {
             try
             {
-                // CORRECCIÓN: Extraer explícitamente el claim IdPaciente, no el NameIdentifier
                 var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
                 
                 if (string.IsNullOrEmpty(idPacienteClaim) || !int.TryParse(idPacienteClaim, out int idPacienteToken))
                 {
-                    return Results.Unauthorized(); 
+                    return Results.BadRequest(new { error = "Tu usuario actual no tiene un perfil de paciente asociado para consultar citas." });
                 }
 
                 var citas = await service.ObtenerAgendaPacienteAsync(idPacienteToken, fechaInicio, fechaFin);
@@ -109,11 +112,15 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem($"Ocurrió un error inesperado al consultar las citas del paciente: {ex.Message}");
+                Console.WriteLine($"[ERROR CONSULTA PACIENTE]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
 
-        // 4. GET /api/citas/medico/{idMedico}?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD -> Agenda del Médico
+        // 4. GET /api/citas/medico/{idMedico}
         citasGroup.MapGet("/medico/{idMedico:int}", async (
             int idMedico, 
             DateOnly fechaInicio, 
@@ -131,11 +138,15 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al consultar la agenda del médico.");
+                Console.WriteLine($"[ERROR CONSULTA MEDICO]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
 
-        // 5. PUT /api/citas/{id}/cancelar -> Cancelar cita
+        // 5. PUT /api/citas/{id}/cancelar
         citasGroup.MapPut("/{id:int}/cancelar", async (
             int id, 
             CitaService service, 
@@ -143,9 +154,8 @@ public static class CitasEndpoints
         {
             try
             {
-                // CORRECCIÓN: Utilizar IdPaciente para la validación de propiedad de la cita
                 var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
-                int.TryParse(idPacienteClaim, out int idPacienteToken); // Si es null, quedará en 0 (Admin/Recepcionista)
+                int.TryParse(idPacienteClaim, out int idPacienteToken); 
 
                 var rolUsuario = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("rol")?.Value ?? "";
 
@@ -169,11 +179,15 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al cancelar la cita.");
+                Console.WriteLine($"[ERROR CANCELAR CITA]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
 
-        // 6. PUT /api/citas/{id}/reprogramar -> Reprogramar fecha/hora
+        // 6. PUT /api/citas/{id}/reprogramar
         citasGroup.MapPut("/{id:int}/reprogramar", async (
             int id, 
             ReprogramarCitaRequestDto req, 
@@ -182,7 +196,6 @@ public static class CitasEndpoints
         {
             try
             {
-                // CORRECCIÓN: Utilizar IdPaciente para la validación de propiedad de la cita
                 var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
                 int.TryParse(idPacienteClaim, out int idPacienteToken); 
 
@@ -212,11 +225,15 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al reprogramar la cita.");
+                Console.WriteLine($"[ERROR REPROGRAMAR CITA]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
 
-        // 7. PUT /api/citas/{id}/estado -> Cambiar estado (Atendida/Inasistencia)
+        // 7. PUT /api/citas/{id}/estado
         citasGroup.MapPut("/{id:int}/estado", async (
             int id, 
             CambiarEstadoCitaDto dto, 
@@ -240,7 +257,11 @@ public static class CitasEndpoints
             }
             catch (Exception ex)
             {
-                return Results.Problem("Ocurrió un error inesperado al actualizar el estado de la cita.");
+                Console.WriteLine($"[ERROR ESTADO CITA]: {ex}");
+                return Results.Problem(
+                    detail: $"{ex.Message} | Inner: {ex.InnerException?.Message}",
+                    statusCode: 500
+                );
             }
         });
     }
