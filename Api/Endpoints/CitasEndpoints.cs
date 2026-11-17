@@ -24,6 +24,7 @@ public static class CitasEndpoints
         {
             try
             {
+                var rolUsuario = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
                 var idPacienteClaim = user.FindFirst("IdPaciente")?.Value;
                 int? idPacienteToken = null;
                 
@@ -32,15 +33,21 @@ public static class CitasEndpoints
                     idPacienteToken = parsedId;
                 }
 
-                // Determinar qué ID de paciente usar: el del request (si lo envía un recepcionista/admin) o el del token
-                var idPacienteFinal = req.IdPaciente ?? idPacienteToken;
+                // REGLA CLAVE: Si es Paciente, usamos estrictamente su token (13) e ignoramos el JSON del front (19).
+                // Si es Admin o Recepcionista, usamos el IdPaciente que enviaron en el JSON.
+                int? idPacienteFinal = rolUsuario == "Paciente" 
+                    ? idPacienteToken 
+                    : req.IdPaciente;
 
                 if (idPacienteFinal == null || idPacienteFinal <= 0)
                 {
-                    return Results.BadRequest(new { error = "No se pudo identificar un perfil de paciente válido. Envíe el IdPaciente en la petición o inicie sesión con una cuenta de paciente válida." });
+                    return Results.BadRequest(new { error = "No se encontró un perfil de paciente válido para agendar la cita." });
                 }
 
-                var idCita = await service.AgendarCitaAsync(req, idPacienteFinal.Value);
+                // Pasamos req con el IdPaciente limpio o lo manejamos directo en el servicio
+                var reqCorregido = req with { IdPaciente = idPacienteFinal };
+                var idCita = await service.AgendarCitaAsync(reqCorregido, idPacienteFinal.Value);
+                
                 return Results.Ok(new { message = "Cita agendada con éxito", idCita });
             }
             catch (InvalidOperationException ex) 
